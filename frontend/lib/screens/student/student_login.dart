@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-
 import '../../services/api_service.dart';
+import '../../widgets/connection_settings_dialog.dart';
+import 'student_dashboard.dart';
 
 class StudentLogin extends StatefulWidget {
   const StudentLogin({super.key});
@@ -10,67 +11,54 @@ class StudentLogin extends StatefulWidget {
 }
 
 class _StudentLoginState extends State<StudentLogin> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController(text: 'roshi@gmail.com');
+  final _passwordController = TextEditingController(text: 'roshi123');
 
-  bool loading = false;
-  bool obscurePassword = true;
-  String? errorMessage;
+  bool _loading = false;
+  bool _obscurePassword = true;
+  String? _errorMessage;
 
-  Future<void> handleLogin() async {
-    if (emailController.text.trim().isEmpty ||
-        passwordController.text.isEmpty) {
-      setState(() {
-        errorMessage = 'Please enter your email and password.';
-      });
-      return;
-    }
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      loading = true;
-      errorMessage = null;
+      _loading = true;
+      _errorMessage = null;
     });
 
     try {
       final result = await ApiService.login(
-        email: emailController.text.trim(),
-        password: passwordController.text,
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
 
       final role = result['role']?.toString().toLowerCase();
-
       if (role != 'student') {
-        throw Exception(
-          'This account does not have Student access.',
-        );
+        throw Exception('Access denied: This account has "$role" privileges, not Student.');
       }
 
       final token = result['access_token'];
-
       if (token == null || token.toString().isEmpty) {
         throw Exception('The server did not return an access token.');
       }
 
       if (!mounted) return;
 
-      // Student Dashboard will be connected here when implemented.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Welcome, ${result['name'] ?? 'Student'}! Authentication successful.',
-          ),
-        ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentDashboard()),
       );
     } catch (e) {
       if (mounted) {
         setState(() {
-          errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
     } finally {
       if (mounted) {
         setState(() {
-          loading = false;
+          _loading = false;
         });
       }
     }
@@ -78,117 +66,201 @@ class _StudentLoginState extends State<StudentLogin> {
 
   @override
   void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Student Login'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Server Settings',
+            icon: const Icon(Icons.settings_ethernet_rounded),
+            onPressed: () => ConnectionSettingsDialog.show(context),
+          ),
+        ],
       ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Card(
               elevation: 0,
               color: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(color: Color(0xFFE4E8F0)),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.school_rounded,
-                      size: 72,
-                      color: Color(0xFF3157D5),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Student Portal',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Sign in to view faculty and submit feedback.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 28),
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    TextField(
-                      controller: passwordController,
-                      obscureText: obscurePassword,
-                      autofillHints: const [AutofillHints.password],
-                      onSubmitted: (_) {
-                        if (!loading) handleLogin();
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              obscurePassword = !obscurePassword;
-                            });
-                          },
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.school_rounded,
+                          size: 48,
+                          color: Color(0xFF2563EB),
                         ),
                       ),
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        errorMessage!,
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Student Portal',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Sign in to submit faculty evaluations and review your feedback history.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Email input
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Student Email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Email address is required.';
+                          }
+                          if (!value.contains('@')) {
+                            return 'Please enter a valid email address.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Password input
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password is required.';
+                          }
+                          return null;
+                        },
+                        onFieldSubmitted: (_) {
+                          if (!_loading) _handleLogin();
+                        },
+                      ),
+
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Login as Student', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Quick Fill Demo Button
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Demo Student: ',
+                              style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                _emailController.text = 'roshi@gmail.com';
+                                _passwordController.text = 'roshi123';
+                              },
+                              child: const Text(
+                                'roshi@gmail.com / roshi123',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : handleLogin,
-                        child: loading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Login as Student'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

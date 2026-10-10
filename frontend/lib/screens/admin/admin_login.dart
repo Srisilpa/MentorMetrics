@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../../services/api_service.dart';
+import '../../widgets/connection_settings_dialog.dart';
 import 'admin_dashboard.dart';
 
 class AdminLogin extends StatefulWidget {
@@ -11,66 +11,54 @@ class AdminLogin extends StatefulWidget {
 }
 
 class _AdminLoginState extends State<AdminLogin> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController(text: 'vinay123@gmail.com');
+  final _passwordController = TextEditingController(text: 'vinay123');
 
-  bool loading = false;
-  bool obscurePassword = true;
-  String? errorMessage;
+  bool _loading = false;
+  bool _obscurePassword = true;
+  String? _errorMessage;
 
-  Future<void> handleLogin() async {
-    if (emailController.text.trim().isEmpty ||
-        passwordController.text.isEmpty) {
-      setState(() {
-        errorMessage = 'Please enter your email and password.';
-      });
-      return;
-    }
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      loading = true;
-      errorMessage = null;
+      _loading = true;
+      _errorMessage = null;
     });
 
     try {
       final result = await ApiService.login(
-        email: emailController.text.trim(),
-        password: passwordController.text,
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
 
       final role = result['role']?.toString().toLowerCase();
-
       if (role != 'admin') {
-        throw Exception(
-          'This account does not have Admin access.',
-        );
+        throw Exception('Access denied: This account has "$role" privileges, not Administrator.');
       }
 
       final token = result['access_token'];
-
       if (token == null || token.toString().isEmpty) {
         throw Exception('The server did not return an access token.');
       }
 
       if (!mounted) return;
 
-      // Navigate only after the backend authenticates the user.
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => const AdminDashboard(),
-        ),
+        MaterialPageRoute(builder: (_) => const AdminDashboard()),
       );
     } catch (e) {
       if (mounted) {
         setState(() {
-          errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
     } finally {
       if (mounted) {
         setState(() {
-          loading = false;
+          _loading = false;
         });
       }
     }
@@ -78,117 +66,198 @@ class _AdminLoginState extends State<AdminLogin> {
 
   @override
   void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Admin Login'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Server Settings',
+            icon: const Icon(Icons.settings_ethernet_rounded),
+            onPressed: () => ConnectionSettingsDialog.show(context),
+          ),
+        ],
       ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Card(
               elevation: 0,
               color: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(color: Color(0xFFE4E8F0)),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.admin_panel_settings_rounded,
-                      size: 72,
-                      color: Color(0xFF3157D5),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Admin Portal',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Sign in to manage faculty and analytics.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 28),
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    TextField(
-                      controller: passwordController,
-                      obscureText: obscurePassword,
-                      autofillHints: const [AutofillHints.password],
-                      onSubmitted: (_) {
-                        if (!loading) handleLogin();
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              obscurePassword = !obscurePassword;
-                            });
-                          },
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.admin_panel_settings_rounded,
+                          size: 48,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        errorMessage!,
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Admin Portal',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Secure administrator access for faculty management, analytics, and records.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+                      ),
+                      const SizedBox(height: 28),
+
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Administrator Email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Email address is required.';
+                          }
+                          if (!value.contains('@')) {
+                            return 'Please enter a valid email address.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 18),
+
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password is required.';
+                          }
+                          return null;
+                        },
+                        onFieldSubmitted: (_) {
+                          if (!_loading) _handleLogin();
+                        },
+                      ),
+
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _loading ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Login as Admin', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Demo Admin: ',
+                              style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                _emailController.text = 'vinay123@gmail.com';
+                                _passwordController.text = 'vinay123';
+                              },
+                              child: const Text(
+                                'vinay123@gmail.com / vinay123',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : handleLogin,
-                        child: loading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Login as Admin'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
